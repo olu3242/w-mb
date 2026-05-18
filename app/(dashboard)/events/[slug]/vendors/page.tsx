@@ -2,20 +2,110 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { addVendor, deleteVendor } from '@/app/actions/vendors'
 import { VendorStatusSelect } from '@/components/events/vendor-status-select'
+import { VendorInquiryForm } from '@/components/vendors/vendor-inquiry-form'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils'
+import { getPlanningTemplate } from '@/lib/occasion/planning-templates'
+import type { OccasionType } from '@/lib/occasion/occasion-types'
 
-export default async function VendorsPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function VendorsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ category?: string }>
+}) {
   const { slug } = await params
+  const { category } = await searchParams
   const supabase = await createClient()
-  const { data: event } = await supabase.from('events').select('id').eq('slug', slug).single()
+  const { data: event } = await supabase.from('events').select('id, event_date, occasion_type').eq('slug', slug).single()
   if (!event) notFound()
 
-  const { data: vendors } = await supabase.from('vendors').select('*').eq('event_id', event.id).order('created_at')
+  const template = getPlanningTemplate(event.occasion_type as OccasionType)
+  const selectedCategory = category ?? template.vendorNeeds[0]
+  const [
+    { data: vendors },
+    { data: marketplace },
+    { data: inquiries },
+  ] = await Promise.all([
+    supabase.from('vendors').select('*').eq('event_id', event.id).order('created_at'),
+    supabase
+      .from('vendor_directory')
+      .select('*')
+      .ilike('category', `%${selectedCategory}%`)
+      .order('is_verified', { ascending: false })
+      .order('rating', { ascending: false }),
+    supabase
+      .from('vendor_inquiries')
+      .select('id, status, message, created_at, vendor_directory(name, category)')
+      .eq('occasion_id', event.id)
+      .order('created_at', { ascending: false }),
+  ])
 
   return (
     <div className="flex flex-col gap-6">
-      <h2 className="font-display text-xl font-bold">Vendor Hub</h2>
+      <div>
+        <h2 className="font-display text-xl font-bold">Vendor Hub</h2>
+        <p className="mt-1 text-sm text-foreground/50">Browse suggested vendors and send lightweight quote requests. Use the category pills to narrow your search.</p>
+      </div>
+
+      <section className="rounded-xl border border-white/5 p-4">
+        <h3 className="font-display text-lg font-semibold">Suggested vendor categories</h3>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {template.vendorNeeds.map(vendorCategory => (
+            <a
+              key={vendorCategory}
+              href={`/events/${slug}/vendors?category=${encodeURIComponent(vendorCategory)}`}
+              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                selectedCategory === vendorCategory
+                  ? 'border-pulse/30 bg-pulse/10 text-pulse'
+                  : 'border-white/10 text-foreground/60 hover:border-white/20'
+              }`}
+            >
+              {vendorCategory}
+            </a>
+          ))}
+        </div>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-3">
+          {(marketplace ?? []).map(vendor => (
+            <div key={vendor.id} className="rounded-xl border border-white/5 bg-white/[0.03] p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium">{vendor.name}</p>
+                  <p className="mt-1 text-xs text-foreground/50">{vendor.category} · {[vendor.city, vendor.country].filter(Boolean).join(', ')}</p>
+                </div>
+                {vendor.is_verified && <span className="rounded-full bg-sage/10 px-2 py-1 text-[11px] text-sage">Verified</span>}
+              </div>
+              {vendor.description && <p className="mt-3 text-sm leading-5 text-foreground/60">{vendor.description}</p>}
+              {vendor.rating != null && <p className="mt-2 text-xs text-foreground/40">Rating {vendor.rating}/5</p>}
+              <VendorInquiryForm eventId={event.id} vendorId={vendor.id} eventDate={event.event_date} />
+            </div>
+          ))}
+          {!marketplace?.length && (
+            <div className="rounded-xl border border-white/5 p-6 text-sm text-foreground/40">
+              No suggested vendors in this category yet. Add a vendor manually or try a different category to keep the plan moving.
+            </div>
+          )}
+        </div>
+      </section>
+
+      {!!inquiries?.length && (
+        <section className="rounded-xl border border-white/5 p-4">
+          <h3 className="font-display text-lg font-semibold">Quote requests</h3>
+          <div className="mt-3 grid gap-3">
+            {inquiries.map(inquiry => (
+              <div key={inquiry.id} className="rounded-lg border border-white/5 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium">{inquiry.vendor_directory?.name ?? 'Vendor'}</p>
+                  <span className="rounded-full bg-white/5 px-2 py-1 text-xs text-foreground/50">{inquiry.status}</span>
+                </div>
+                <p className="mt-1 text-xs text-foreground/50">{inquiry.message}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <form action={addVendor} className="flex flex-wrap gap-3 rounded-xl border border-white/5 p-4">
         <input type="hidden" name="event_id" value={event.id} />

@@ -88,6 +88,11 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [callbackError] = useState(() =>
+    typeof window === "undefined"
+      ? ""
+      : new URLSearchParams(window.location.search).get("error") ?? ""
+  );
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -103,7 +108,8 @@ export default function LoginPage() {
       setError(error.message);
       setLoading(false);
     } else {
-      router.push("/dashboard");
+      const next = new URLSearchParams(window.location.search).get("next");
+      router.push(next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard");
       router.refresh();
     }
   }
@@ -116,6 +122,11 @@ export default function LoginPage() {
           Sign in to your account
         </p>
       </div>
+      {callbackError && (
+        <p className="rounded-lg border border-red-400/20 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+          {callbackError}
+        </p>
+      )}
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <input

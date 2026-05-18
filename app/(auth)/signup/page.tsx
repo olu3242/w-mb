@@ -90,26 +90,32 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setMessage("");
     setLoading(true);
     const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
+    const origin = window.location.origin;
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
+        emailRedirectTo: `${origin}/api/auth/callback?next=/dashboard`,
       },
     });
     if (error) {
       setError(error.message);
       setLoading(false);
-    } else {
+    } else if (data.session) {
       router.push("/dashboard");
       router.refresh();
+    } else {
+      setMessage("Check your email to confirm your account, then you will be sent to your dashboard.");
+      setLoading(false);
     }
   }
 
@@ -138,6 +144,7 @@ export default function SignupPage() {
           className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none focus:border-green-500/60"
         />
         {error && <p className="text-sm text-red-400">{error}</p>}
+        {message && <p className="text-sm text-green-300">{message}</p>}
         <button
           type="submit"
           disabled={loading}

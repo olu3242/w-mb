@@ -29,11 +29,11 @@ export default async function EscrowPage({ params }: { params: Promise<{ slug: s
     { data: ledger },
     { data: vendors },
   ] = await Promise.all([
-    admin.from('escrow_accounts').select('*').eq('event_id', event.id).single(),
-    admin.from('vendor_allocations').select('*, vendors(name)').eq('event_id', event.id).order('created_at', { ascending: false }),
-    admin.from('vendor_payouts').select('*').eq('event_id', event.id).order('created_at', { ascending: false }),
-    admin.from('escrow_transactions').select('*').eq('event_id', event.id).order('created_at', { ascending: false }).limit(50),
-    supabase.from('vendors').select('id, name, category').eq('event_id', event.id),
+    admin.from('escrow_accounts').select('*').eq('event_id' as const, event.id).single(),
+    admin.from('vendor_allocations').select('*, vendors(name)').eq('event_id' as const, event.id).order('created_at', { ascending: false }),
+    admin.from('vendor_payouts').select('*').eq('event_id' as const, event.id).order('created_at', { ascending: false }),
+    admin.from('escrow_transactions').select('*').eq('event_id' as const, event.id).order('created_at', { ascending: false }).limit(50),
+    supabase.from('vendors').select('id, name, category').eq('event_id' as const, event.id),
   ])
 
   const balance = Number(escrow?.balance ?? 0)

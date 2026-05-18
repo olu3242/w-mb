@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { logActivity } from '@/lib/ops/activity'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
@@ -27,7 +28,21 @@ export async function addTask(formData: FormData) {
 
 export async function updateTaskStatus(id: string, status: string, slug: string) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
   await supabase.from('tasks').update({ status }).eq('id', id)
+  if (status === 'done') {
+    const { data: task } = await supabase.from('tasks').select('event_id, title').eq('id', id).single()
+    if (task) {
+      await logActivity(supabase, {
+        occasionId: task.event_id,
+        actorId: user?.id ?? null,
+        activityType: 'task.completed',
+        title: `Task completed: ${task.title}`,
+        entityType: 'task',
+        entityId: id,
+      })
+    }
+  }
   revalidatePath(`/events/${slug}/tasks`)
 }
 

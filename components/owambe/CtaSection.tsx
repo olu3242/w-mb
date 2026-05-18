@@ -34,7 +34,7 @@ export default function CtaSection() {
             Plan My Owambe
           </button>
           <button className="border-2 border-[#1A1A1A] text-[#1A1A1A] px-12 py-6 text-xl font-black uppercase hover:bg-[#FF7F50] hover:text-white hover:border-[#FF7F50] transition-all">
-            I'm a Guest
+            I&apos;m a Guest
           </button>
         </motion.div>
 

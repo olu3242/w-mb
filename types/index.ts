@@ -18,7 +18,17 @@ export type Event = {
   event_date?: string
   location?: string
   is_public: boolean
+  occasion_type?: string | null
+  theme_id?: string | null
+  emotional_mode?: string | null
+  ai_plan_seed?: Record<string, unknown> | null
+  modules?: string[] | null
   signals: EventSignals
+  currency?: string
+  timezone?: string
+  locale?: string
+  country?: string | null
+  diaspora_hub?: string | null
   owner_id: string
   stripe_account_id?: string
   alice_unlocked: boolean

@@ -59,6 +59,7 @@ export default async function AlicePage({ params }: { params: Promise<{ slug: st
     : null
 
   const eventDateMs = event.event_date ? new Date(event.event_date).getTime() : null
+  // eslint-disable-next-line react-hooks/purity
   const now = Date.now()
   const daysToEvent = eventDateMs ? Math.ceil((eventDateMs - now) / 86400000) : null
   const showT7 = daysToEvent !== null && daysToEvent <= 7 && daysToEvent >= 0

@@ -25,11 +25,6 @@ max_client_conn = 100
 [realtime]
 enabled = true
 ip_version = "IPv4"
-heartbeat_interval_ms = 5000
-poll_interval_ms = 100
-poll_max_changes = 100
-poll_max_record_bytes = 1048576
-broadcast_max_seconds = 10
 
 [studio]
 enabled = true

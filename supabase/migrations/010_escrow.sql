@@ -84,7 +84,7 @@ alter table vendors
 
 create trigger update_escrow_accounts_updated_at
   before update on escrow_accounts
-  for each row execute function update_updated_at_column();
+  for each row execute function update_updated_at();
 
 -- RLS
 alter table escrow_accounts     enable row level security;

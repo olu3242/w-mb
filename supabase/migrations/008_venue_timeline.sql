@@ -31,7 +31,7 @@ create table timeline_items (
 
 create trigger update_venues_updated_at
   before update on venues
-  for each row execute function update_updated_at_column();
+  for each row execute function update_updated_at();
 
 alter table venues enable row level security;
 alter table timeline_items enable row level security;

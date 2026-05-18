@@ -85,11 +85,11 @@ alter table event_facets
 -- updated_at triggers
 create trigger update_client_preferences_updated_at
   before update on client_preferences
-  for each row execute function update_updated_at_column();
+  for each row execute function update_updated_at();
 
 create trigger update_event_inventory_updated_at
   before update on event_inventory
-  for each row execute function update_updated_at_column();
+  for each row execute function update_updated_at();
 
 -- RLS
 alter table vendor_scores enable row level security;

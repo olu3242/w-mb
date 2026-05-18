@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "smoke:launch": "node scripts/launch-readiness-check.mjs",
     "db:types": "supabase gen types typescript --local > types/database.ts",
     "db:reset": "supabase db reset"
   },

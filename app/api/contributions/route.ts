@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getStripeServer } from '@/lib/stripe/client'
 import { ContributionSchema } from '@/lib/validations'
 import { NextResponse } from 'next/server'
@@ -10,6 +11,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
 
   const supabase = await createClient()
+  const admin = createAdminClient()
 
   const { data: event } = await supabase
     .from('events')
@@ -38,16 +40,19 @@ export async function POST(request: Request) {
     },
   })
 
-  const { data: contribution, error } = await supabase
+  const { data: contribution, error } = await admin
     .from('contributions')
     .insert({
       event_id: parsed.data.event_id,
+      occasion_id: parsed.data.event_id,
       gift_item_id: parsed.data.gift_item_id ?? null,
       amount: parsed.data.amount,
       contributor_name: parsed.data.contributor_name,
       contributor_email: parsed.data.contributor_email,
       message: parsed.data.message ?? null,
       stripe_payment_intent_id: paymentIntent.id,
+      payment_provider: 'stripe',
+      provider_payment_intent_id: paymentIntent.id,
       status: 'pending',
     })
     .select()
