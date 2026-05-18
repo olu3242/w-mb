@@ -74,16 +74,13 @@ export default function Footer() {
               <ul className="space-y-4">
                 {modules.map((m) => (
                   <li key={m.label}>
-                    <Link
-                      href={m.href}
-                      className="group flex items-center gap-1 text-sm font-bold text-zinc-500 hover:text-emerald-600 transition-all"
+                    <span
+                      className="group flex items-center gap-1 text-sm font-bold text-zinc-400 cursor-not-allowed"
+                      aria-disabled="true"
+                      title="Coming soon"
                     >
                       {m.label}
-                      <ArrowUpRight
-                        size={14}
-                        className="opacity-0 -translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all"
-                      />
-                    </Link>
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -100,13 +97,14 @@ export default function Footer() {
 
                   return (
                     <li key={c.label}>
-                      <Link
-                        href={c.href}
-                        className="group flex items-center gap-3 text-sm font-bold text-zinc-500 hover:text-emerald-600 transition-all"
+                      <span
+                        className="group flex items-center gap-3 text-sm font-bold text-zinc-400 cursor-not-allowed"
+                        aria-disabled="true"
+                        title="Coming soon"
                       >
-                        <Icon className="w-4 h-4 text-zinc-300 group-hover:text-emerald-500 transition-colors" />
+                        <Icon className="w-4 h-4 text-zinc-300 transition-colors" />
                         {c.label}
-                      </Link>
+                      </span>
                     </li>
                   );
                 })}
@@ -136,27 +134,19 @@ export default function Footer() {
             <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">
               © 2026 OWAMBE SYSTEMS.
             </p>
-            <Link
-              href="#"
-              className="text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-emerald-600"
+              <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 opacity-50 cursor-not-allowed" aria-disabled="true">
+                Privacy (coming soon)
+              </span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 opacity-50 cursor-not-allowed" aria-disabled="true">
+                Terms (coming soon)
+              </span>
+            </div>
+            <motion.div
+              className="flex items-center gap-3 order-1 md:order-2 px-6 py-2 rounded-full bg-zinc-900 text-[#F9F7F2] text-[10px] font-black uppercase tracking-widest cursor-pointer"
             >
-              Privacy
-            </Link>
-            <Link
-              href="#"
-              className="text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-emerald-600"
-            >
-              Terms
-            </Link>
-          </div>
-
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            className="flex items-center gap-3 order-1 md:order-2 px-6 py-2 rounded-full bg-zinc-900 text-[#F9F7F2] text-[10px] font-black uppercase tracking-widest cursor-pointer"
-          >
-            Redefining Celebration{" "}
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-          </motion.div>
+              Redefining Celebration{" "}
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            </motion.div>
         </div>
       </div>
     </footer>

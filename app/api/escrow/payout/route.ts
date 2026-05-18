@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
     const transferRef = `OWAMBE-PAYOUT-${alloc.id}-${Date.now()}`
     const transfer = await initiateTransfer({
       amountNgn: Number(alloc.amount),
-      recipientCode,
+      recipientCode: recipientCode!,
       reason: `Event vendor payment`,
       reference: transferRef,
     })

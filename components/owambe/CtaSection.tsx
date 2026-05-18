@@ -30,11 +30,15 @@ export default function CtaSection() {
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.7, delay: 0.2 }}
         >
-          <button className="bg-[#1A1A1A] text-[#F9F7F2] px-12 py-6 text-xl font-black uppercase border border-[#1A1A1A] shadow-[5px_5px_0px_#065F46] hover:bg-[#FACC15] hover:text-[#1A1A1A] transition-all">
+          <a href="/signup" className="inline-flex bg-[#1A1A1A] text-[#F9F7F2] px-12 py-6 text-xl font-black uppercase border border-[#1A1A1A] shadow-[5px_5px_0px_#065F46] hover:bg-[#FACC15] hover:text-[#1A1A1A] transition-all">
             Plan My Owambe
-          </button>
-          <button className="border-2 border-[#1A1A1A] text-[#1A1A1A] px-12 py-6 text-xl font-black uppercase hover:bg-[#FF7F50] hover:text-white hover:border-[#FF7F50] transition-all">
-            I&apos;m a Guest
+          </a>
+          <button
+            disabled
+            title="Guest access is coming soon"
+            className="border-2 border-[#1A1A1A] text-[#6B7280] px-12 py-6 text-xl font-black uppercase bg-white/5 cursor-not-allowed"
+          >
+            Guest access coming soon
           </button>
         </motion.div>
 

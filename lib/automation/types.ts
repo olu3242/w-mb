@@ -9,6 +9,10 @@ export type AutomationSourceType =
   | 'budget'
   | 'payout'
   | 'organization_event'
+  | 'event_invitation'
+  | 'event_announcement'
+  | 'gallery_section'
+  | 'gallery_media'
   | 'system'
 
 export type AutomationEventType =
@@ -27,6 +31,16 @@ export type AutomationEventType =
   | 'payout_requested'
   | 'event_date_approaching'
   | 'event_completed'
+  | 'event_invitation_created'
+  | 'event_announcement_created'
+  | 'urgent_announcement_published'
+  | 'rsvp_reminder_announcement_created'
+  | 'memory_prompt_announcement_created'
+  | 'gallery_section_created'
+  | 'gallery_media_uploaded'
+  | 'guest_gallery_media_uploaded'
+  | 'post_event_gallery_prompt_created'
+  | 'recap_gallery_prompt_created'
   | 'organization_event_due'
 
 export type AutomationActionType =

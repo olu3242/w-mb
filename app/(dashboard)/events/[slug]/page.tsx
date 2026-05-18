@@ -26,6 +26,10 @@ import {
   buildWhatsappShareUrl,
   buildWhatsappVendorCheckin,
 } from '@/lib/ai/tools/whatsapp'
+import { InvitationPreview } from '@/components/invitations/invitation-preview'
+import { buildWhatsappShareUrl as buildInvitationWhatsappShareUrl, generateInvitationCopy } from '@/lib/invitations/generator'
+import { buildAnnouncementWhatsappUrl } from '@/lib/announcements/templates'
+import { getGallerySectionPresets, getGalleryShareCopy, getGalleryWhatsappUrl } from '@/lib/gallery/templates'
 import { formatCurrency, normalizeCurrency } from '@/lib/currency'
 import type { Event } from '@/types'
 
@@ -39,6 +43,8 @@ const TABS = [
   { href: '/timeline', label: 'Timeline', signal: 'has_timeline' },
   { href: '/committee', label: 'Committee' },
   { href: '/guests', label: 'Guests' },
+  { href: '/invitations', label: 'Invitation' },
+  { href: '/gallery', label: 'Gallery' },
   { href: '/updates', label: 'Updates' },
   { href: '/escrow', label: 'Escrow' },
   { href: '/alice', label: '🧠 ALICE', aliceOnly: true },
@@ -77,6 +83,10 @@ export default async function EventHubPage({ params }: { params: Promise<{ slug:
     { data: payoutRequests },
     { data: guests },
     { data: announcements },
+    { data: eventAnnouncements },
+    { data: activeInvitation },
+    { data: gallerySections },
+    { data: galleryMedia },
     { data: activityFeed },
     { data: checkins },
     { data: emergencyAlerts },
@@ -119,6 +129,10 @@ export default async function EventHubPage({ params }: { params: Promise<{ slug:
     supabase.from('payout_requests').select('*').eq('occasion_id', ev.id).order('requested_at', { ascending: false }).limit(3),
     supabase.from('event_guests').select('id, status, guest_count').eq('occasion_id', ev.id),
     supabase.from('announcements').select('id, title, body, audience, channel, created_at').eq('occasion_id', ev.id).order('created_at', { ascending: false }).limit(3),
+    supabase.from('event_announcements').select('*').eq('occasion_id', ev.id).order('pinned', { ascending: false }).order('publish_at', { ascending: false }).limit(5),
+    supabase.from('event_invitations').select('*').eq('occasion_id', ev.id).eq('is_active', true).order('created_at', { ascending: false }).maybeSingle(),
+    supabase.from('event_gallery_sections').select('*').eq('occasion_id', ev.id).eq('is_active', true).order('sort_order', { ascending: true }).limit(6),
+    supabase.from('event_gallery_media').select('*').eq('occasion_id', ev.id).order('created_at', { ascending: false }).limit(6),
     supabase.from('activity_feed').select('*').eq('occasion_id', ev.id).order('created_at', { ascending: false }).limit(8),
     supabase.from('event_checkins').select('*').eq('occasion_id', ev.id).order('created_at', { ascending: false }).limit(6),
     supabase.from('event_emergency_alerts').select('*').eq('occasion_id', ev.id).order('created_at', { ascending: false }).limit(4),
@@ -134,7 +148,7 @@ export default async function EventHubPage({ params }: { params: Promise<{ slug:
   const completedTasks = checklist?.filter(task => task.status === 'done').length ?? 0
   const progress = totalTasks ? Math.round((completedTasks / totalTasks) * 100) : 0
   const nextActions = Array.isArray(workspaceSettings?.next_actions)
-    ? workspaceSettings.next_actions.filter((item): item is string => typeof item === 'string')
+    ? (workspaceSettings.next_actions as unknown[]).filter((item): item is string => typeof item === 'string')
     : fallbackTemplate.nextActions
   const fundedTotal = sponsorshipCategories?.reduce((sum, category) => sum + Number(category.funded_amount ?? 0), 0) ?? 0
   const targetTotal = sponsorshipCategories?.reduce((sum, category) => sum + Number(category.target_amount ?? 0), 0) ?? 0
@@ -191,6 +205,21 @@ export default async function EventHubPage({ params }: { params: Promise<{ slug:
   ])
   const publicEventUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? ''}/e/${slug}`
   const publicPath = `/e/${slug}`
+  const shareTarget = publicEventUrl || publicPath
+  const invitationWhatsappCopy = generateInvitationCopy({
+    occasionType,
+    eventName: activeInvitation?.title ?? ev.title,
+    dateTime: ev.event_date,
+    location: activeInvitation?.venue_address ?? ev.location,
+    hostNames: activeInvitation?.host_names,
+    rsvpLink: shareTarget,
+    contributionLink: `${shareTarget}#pledge`,
+    templateId: activeInvitation?.template_id,
+  }).whatsappCopy
+  const galleryPresets = getGallerySectionPresets(occasionType)
+  const galleryShareCopy = getGalleryShareCopy({ eventName: ev.title, link: `${shareTarget}#gallery`, occasionType })
+  const approvedGalleryMedia = galleryMedia?.filter(item => item.moderation_status === 'approved').length ?? 0
+  const pendingGalleryMedia = galleryMedia?.filter(item => item.moderation_status === 'pending').length ?? 0
   const checkedInCount = checkins?.filter(item => item.checked_in).length ?? 0
   const openAlerts = emergencyAlerts?.filter(alert => !alert.resolved).length ?? 0
   const eventCurrency = normalizeCurrency(ev.currency ?? 'USD')
@@ -241,6 +270,7 @@ export default async function EventHubPage({ params }: { params: Promise<{ slug:
           <div className="mt-3 flex flex-wrap gap-2">
             <Link href={`${base}/tasks`} className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-foreground/70 hover:border-white/20">Open tasks</Link>
             <Link href={`${base}/guests`} className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-foreground/70 hover:border-white/20">Share invites</Link>
+            <Link href={`${base}/invitations`} className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-foreground/70 hover:border-white/20">Invitation Studio</Link>
             <Link href={`${base}/updates`} className="rounded-full border border-white/10 px-3 py-1.5 text-xs text-foreground/70 hover:border-white/20">Post update</Link>
             {ev.is_public && <Link href={`/e/${slug}`} className="rounded-full border border-ocean/30 px-3 py-1.5 text-xs text-ocean hover:bg-ocean/10">Share public page</Link>}
           </div>
@@ -551,6 +581,128 @@ export default async function EventHubPage({ params }: { params: Promise<{ slug:
         </div>
       </section>
 
+      <section className="grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
+        <div className="rounded-xl border border-white/5 bg-white/[0.03] p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-foreground/40">Invitation Studio</p>
+              <h3 className="mt-2 font-display text-lg font-bold">{activeInvitation ? activeInvitation.title : 'Create or import an invitation'}</h3>
+              <p className="mt-2 text-sm leading-6 text-foreground/60">
+                Attach a designed card, uploaded invitation, or generated copy to the public event page and RSVP flow.
+              </p>
+            </div>
+            <Link href={`${base}/invitations`} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-foreground/60 hover:border-white/20">
+              Edit
+            </Link>
+          </div>
+          <div className="mt-4">
+            {activeInvitation ? (
+              <InvitationPreview
+                title={activeInvitation.title}
+                subtitle={activeInvitation.subtitle}
+                body={activeInvitation.body}
+                hostNames={activeInvitation.host_names}
+                dateTime={ev.event_date ? new Date(ev.event_date).toLocaleString(eventLocale, { dateStyle: 'full', timeStyle: 'short', timeZone: ev.timezone ?? 'UTC' }) : null}
+                venueName={activeInvitation.venue_name}
+                venueAddress={activeInvitation.venue_address}
+                dressCode={activeInvitation.dress_code}
+                rsvpNote={activeInvitation.rsvp_note}
+                supportNote={activeInvitation.support_note}
+                templateId={activeInvitation.template_id}
+                fileUrl={activeInvitation.file_url}
+                previewUrl={activeInvitation.preview_url}
+              />
+            ) : (
+              <div className="rounded-xl border border-dashed border-white/10 p-6 text-sm text-foreground/50">
+                No active invitation yet. Open Studio to import, design, or generate the first one.
+              </div>
+            )}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <a href={buildInvitationWhatsappShareUrl(invitationWhatsappCopy)} target="_blank" rel="noreferrer" className="rounded-lg border border-sage/20 bg-sage/10 px-3 py-2 text-sm font-medium text-sage hover:bg-sage/15">
+              Share invitation
+            </a>
+            <Link href={publicPath} className="rounded-lg border border-white/10 px-3 py-2 text-sm text-foreground/60 hover:border-white/20">
+              Public link
+            </Link>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-white/5 bg-white/[0.03] p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-foreground/40">Public service announcements</p>
+              <h3 className="mt-2 font-display text-lg font-bold">Pinned and recent updates</h3>
+            </div>
+            <Link href={`${base}/updates`} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-foreground/60 hover:border-white/20">
+              Create
+            </Link>
+          </div>
+          <div className="mt-4 grid gap-3">
+            {(eventAnnouncements ?? []).map(item => (
+              <article key={item.id} className={`rounded-lg border p-3 ${item.priority === 'urgent' ? 'border-red-400/30 bg-red-500/10' : item.pinned ? 'border-pulse/30 bg-pulse/10' : 'border-white/5 bg-black/10'}`}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-semibold">{item.title}</p>
+                  {item.pinned && <span className="rounded-full bg-pulse/15 px-2 py-0.5 text-[11px] text-pulse">pinned</span>}
+                  <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-foreground/50">{item.visibility.replace(/_/g, ' ')}</span>
+                  <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-foreground/50">{item.priority}</span>
+                </div>
+                <p className="mt-2 text-sm leading-6 text-foreground/60">{item.body}</p>
+                {item.share_to_whatsapp_ready && (
+                  <a href={buildAnnouncementWhatsappUrl({ eventName: ev.title, title: item.title, body: item.body, link: shareTarget })} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg border border-sage/20 px-3 py-1.5 text-xs text-sage hover:bg-sage/10">
+                    Share update
+                  </a>
+                )}
+              </article>
+            ))}
+            {!eventAnnouncements?.length && (
+              <div className="rounded-xl border border-dashed border-white/10 p-6 text-sm text-foreground/50">
+                No PSAs yet. Create venue, RSVP, memorial, logistics, or thank-you updates from the Updates page.
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-white/5 bg-white/[0.03] p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-foreground/40">Event Gallery</p>
+            <h3 className="mt-2 font-display text-lg font-bold">
+              {occasionType === 'funeral_memorial' ? 'Memories across the service' : 'Pre-party, main event, and after-party media'}
+            </h3>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-foreground/60">
+              Organize approved photos and videos by lifecycle section, moderate guest uploads, and share the gallery publicly when ready.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {(gallerySections?.length ? gallerySections : galleryPresets).map(section => (
+                <span key={section.id ?? section.sectionType} className="rounded-full border border-white/10 px-3 py-1 text-xs text-foreground/60">
+                  {section.title}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="grid min-w-56 gap-3">
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <div className="rounded-lg border border-white/5 bg-black/10 p-3">
+                <p className="text-xl font-bold text-sage">{approvedGalleryMedia}</p>
+                <p className="text-xs text-foreground/40">approved</p>
+              </div>
+              <div className="rounded-lg border border-white/5 bg-black/10 p-3">
+                <p className="text-xl font-bold text-amber-200">{pendingGalleryMedia}</p>
+                <p className="text-xs text-foreground/40">pending</p>
+              </div>
+            </div>
+            <Link href={`${base}/gallery`} className="rounded-lg bg-pulse px-3 py-2 text-center text-sm font-semibold text-void hover:bg-pulse/90">
+              Manage gallery
+            </Link>
+            <a href={getGalleryWhatsappUrl(galleryShareCopy)} target="_blank" rel="noreferrer" className="rounded-lg border border-sage/20 px-3 py-2 text-center text-sm text-sage hover:bg-sage/10">
+              Share gallery
+            </a>
+          </div>
+        </div>
+      </section>
+
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="font-display text-xl font-bold">Planning workspace</h2>
@@ -617,7 +769,7 @@ export default async function EventHubPage({ params }: { params: Promise<{ slug:
         <section className="rounded-xl border border-white/5 p-4">
           <h3 className="font-display text-lg font-bold">Next recommended actions</h3>
           <div className="mt-4 grid gap-3">
-            {nextActions.map((action, index) => (
+            {nextActions.map((action: string, index: number) => (
               <div key={action} className="flex items-center gap-3 rounded-lg border border-white/5 bg-white/[0.03] p-3 text-sm">
                 <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-void ${theme.accentColor}`}>
                   {index + 1}
@@ -764,7 +916,7 @@ export default async function EventHubPage({ params }: { params: Promise<{ slug:
             {(vendorInquiries ?? []).map(inquiry => (
               <div key={inquiry.id} className="rounded-lg border border-white/5 p-3">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium">{inquiry.vendor_directory?.name ?? 'Vendor'}</p>
+                  <p className="text-sm font-medium">{getVendorDirectoryName(inquiry.vendor_directory)}</p>
                   <span className="rounded-full bg-white/5 px-2 py-1 text-xs text-foreground/50">{inquiry.status}</span>
                 </div>
                 <p className="mt-1 text-xs text-foreground/50">{inquiry.message}</p>
@@ -886,6 +1038,13 @@ function MiniMetric({ label, value }: { label: string; value: string | number })
       <p className="mt-2 text-sm font-semibold text-foreground">{value}</p>
     </div>
   )
+}
+
+function getVendorDirectoryName(value: unknown) {
+  const record = Array.isArray(value) ? value[0] : value
+  return typeof record === 'object' && record !== null && 'name' in record
+    ? String((record as { name?: unknown }).name ?? 'Vendor')
+    : 'Vendor'
 }
 
 function WhatsappAction({ label, href }: { label: string; href: string }) {

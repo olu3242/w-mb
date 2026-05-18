@@ -97,7 +97,7 @@ export default async function VendorsPage({
             {inquiries.map(inquiry => (
               <div key={inquiry.id} className="rounded-lg border border-white/5 p-3">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium">{inquiry.vendor_directory?.name ?? 'Vendor'}</p>
+                  <p className="text-sm font-medium">{getVendorDirectoryName(inquiry.vendor_directory)}</p>
                   <span className="rounded-full bg-white/5 px-2 py-1 text-xs text-foreground/50">{inquiry.status}</span>
                 </div>
                 <p className="mt-1 text-xs text-foreground/50">{inquiry.message}</p>
@@ -141,4 +141,11 @@ export default async function VendorsPage({
       )}
     </div>
   )
+}
+
+function getVendorDirectoryName(value: unknown) {
+  const record = Array.isArray(value) ? value[0] : value
+  return typeof record === 'object' && record !== null && 'name' in record
+    ? String((record as { name?: unknown }).name ?? 'Vendor')
+    : 'Vendor'
 }

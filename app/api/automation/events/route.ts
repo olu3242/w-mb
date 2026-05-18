@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { enqueueAutomationEvent } from '@/lib/automation/enqueue'
 import { canAccessAutomationScope } from '@/lib/automation/security'
+import type { Json } from '@/types/database'
 
 const Schema = z.object({
   organizationId: z.string().uuid().optional().nullable(),
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
     sourceType: parsed.data.sourceType as never,
     sourceId: parsed.data.sourceId,
     eventType: parsed.data.eventType as never,
-    payload: parsed.data.payload ?? {},
+    payload: (parsed.data.payload ?? {}) as Json,
   })
   return NextResponse.json(result)
 }

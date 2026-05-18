@@ -9,6 +9,7 @@ import type { OccasionType } from '@/lib/occasion/occasion-types'
 type Step1 = { title: string; description: string; event_date: string; location: string }
 type Step2 = { is_public: boolean; signals: Record<string, boolean> }
 type ContextAnswers = { outcome: string; guestMood: string; concern: string }
+type InvitationIntent = 'skip' | 'uploaded' | 'designed' | 'ai_generated'
 
 const SIGNALS = [
   { key: 'has_contributions', label: 'Gift registry & contributions' },
@@ -35,6 +36,7 @@ export default function NewEventPage() {
     guestMood: '',
     concern: '',
   })
+  const [invitationIntent, setInvitationIntent] = useState<InvitationIntent>('skip')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -84,6 +86,7 @@ export default function NewEventPage() {
           vendor_categories: theme.suggestedVendorCategories,
           budget_categories: theme.suggestedBudgetCategories,
           context_answers: contextAnswers,
+          invitation_intent: invitationIntent,
         },
         modules: theme.recommendedModules,
       })
@@ -101,7 +104,7 @@ export default function NewEventPage() {
 
       const data = await response.json()
       if (!response.ok) throw new Error(data.error ?? 'Something went wrong')
-      router.push(`/events/${data.slug}`)
+      router.push(invitationIntent === 'skip' ? `/events/${data.slug}` : `/events/${data.slug}/invitations?mode=${invitationIntent}`)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
       setLoading(false)
@@ -110,8 +113,8 @@ export default function NewEventPage() {
 
   return (
     <div className="mx-auto max-w-3xl py-8">
-      <div className="mb-8 grid grid-cols-5 gap-3 text-xs text-foreground/60">
-        {['Occasion', 'Theme preview', 'AI plan', 'Event details', 'Review'].map((label, index) => (
+      <div className="mb-8 grid grid-cols-6 gap-3 text-xs text-foreground/60">
+        {['Occasion', 'Theme preview', 'AI plan', 'Event details', 'Invitation', 'Review'].map((label, index) => (
           <div key={label} className="flex flex-col items-center gap-2">
             <div className={`h-2 w-full rounded-full ${step > index ? 'bg-pulse' : 'bg-white/10'}`} />
             <span>{label}</span>
@@ -122,7 +125,7 @@ export default function NewEventPage() {
       {step === 1 && (
         <div className="space-y-6">
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-            <p className="text-sm text-foreground/60">Step 1 of 5</p>
+            <p className="text-sm text-foreground/60">Step 1 of 6</p>
             <h1 className="mt-3 text-3xl font-bold">Choose your occasion</h1>
             <p className="mt-2 max-w-2xl text-sm text-foreground/70">
               Start with the right occasion type so Owambe OS can activate the right planning theme, tone, and event modules.
@@ -130,32 +133,43 @@ export default function NewEventPage() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {OCCASION_THEME_OPTIONS.map(option => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => setSelectedOccasion(option.id)}
-                className={`group rounded-3xl border p-6 text-left transition-all ${
-                  selectedOccasion === option.id
-                    ? `border-white/20 bg-white/5 shadow-xl ${option.bgClass}`
-                    : 'border-white/10 bg-[#040404] hover:border-white/20'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className={`text-sm font-semibold ${option.primaryColor}`}>{option.label}</p>
-                    <p className="mt-3 text-sm text-foreground/60">{option.description}</p>
+            {OCCASION_THEME_OPTIONS.map(option => {
+              const isSelected = selectedOccasion === option.id
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setSelectedOccasion(option.id)}
+                  aria-pressed={isSelected}
+                  className={`group rounded-3xl border p-6 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pulse/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black ${
+                    isSelected
+                      ? `border-white/20 bg-white/5 shadow-xl ${option.bgClass}`
+                      : 'border-white/10 bg-[#040404] hover:border-white/20'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className={`text-sm font-semibold ${option.primaryColor}`}>{option.label}</p>
+                      <p className="mt-3 text-sm text-foreground/60">{option.description}</p>
+                    </div>
+                    <div className={`rounded-full px-3 py-1 text-xs font-semibold text-void ${option.accentColor}`}>
+                      {option.label === 'Custom Occasion' ? 'Custom' : option.label.split(' ')[0]}
+                    </div>
                   </div>
-                  <div className={`rounded-full px-3 py-1 text-xs font-semibold text-void ${option.accentColor}`}>
-                    {option.label === 'Custom Occasion' ? 'Custom' : option.label.split(' ')[0]}
+                  <div className="mt-4 text-[13px] text-foreground/50">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-medium text-foreground/70">Recommended modules</p>
+                      {isSelected ? (
+                        <span className="rounded-full bg-pulse/20 px-2 py-1 text-[11px] font-semibold text-pulse">
+                          Selected
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-2 leading-6">{option.recommendedModules.slice(0, 3).join(' · ')}</p>
                   </div>
-                </div>
-                <div className="mt-4 text-[13px] text-foreground/50">
-                  <p className="font-medium text-foreground/70">Recommended modules</p>
-                  <p className="mt-2 leading-6">{option.recommendedModules.slice(0, 3).join(' · ')}</p>
-                </div>
-              </button>
-            ))}
+                </button>
+              )
+            })}
           </div>
 
           <div className="flex justify-end">
@@ -174,7 +188,7 @@ export default function NewEventPage() {
       {step === 2 && (
         <div className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-6">
           <div className="space-y-3">
-            <p className="text-sm uppercase tracking-[0.2em] text-foreground/50">Step 2 of 5</p>
+            <p className="text-sm uppercase tracking-[0.2em] text-foreground/50">Step 2 of 6</p>
             <h1 className="text-3xl font-bold">Theme activation preview</h1>
             <p className="max-w-2xl text-sm text-foreground/70">
               {theme.onboardingCopy ?? 'This occasion theme is now active. Owambe will tailor your planning workspace with the right tone, modules, and recommendations.'}
@@ -233,7 +247,7 @@ export default function NewEventPage() {
       {step === 3 && (
         <div className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-6">
           <div>
-            <p className="text-sm uppercase tracking-[0.2em] text-foreground/50">Step 3 of 5</p>
+            <p className="text-sm uppercase tracking-[0.2em] text-foreground/50">Step 3 of 6</p>
             <h1 className="mt-2 text-3xl font-bold">AI planning intro</h1>
             <p className="mt-2 text-sm text-foreground/70">{theme.aiIntroCopy}</p>
           </div>
@@ -275,7 +289,7 @@ export default function NewEventPage() {
       {step === 4 && (
         <div className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-6">
           <div>
-            <p className="text-sm uppercase tracking-[0.2em] text-foreground/50">Step 4 of 5</p>
+            <p className="text-sm uppercase tracking-[0.2em] text-foreground/50">Step 4 of 6</p>
             <h1 className="mt-2 text-3xl font-bold">Event details</h1>
             <p className="mt-2 text-sm text-foreground/70">
               Share the details and context so Owambe can generate a starter workspace that feels right for this occasion.
@@ -389,16 +403,64 @@ export default function NewEventPage() {
               disabled={!step1.title.trim()}
               className="flex-1 rounded-lg bg-pulse py-3 text-sm font-semibold text-void transition-colors disabled:opacity-50"
             >
-              Continue to review
+              Continue to invitation
             </button>
           </div>
         </div>
       )}
 
       {step === 5 && (
+        <div className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-6">
+          <div>
+            <p className="text-sm uppercase tracking-[0.2em] text-foreground/50">Step 5 of 6</p>
+            <h1 className="mt-2 text-3xl font-bold">Invitation</h1>
+            <p className="mt-2 text-sm text-foreground/70">
+              This step is optional. Choose how you want to start, and Owambe will open Invitation Studio after the event workspace is created.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {[
+              { value: 'skip', title: 'Skip for now', body: 'Create the event first and return to invitations later.' },
+              { value: 'uploaded', title: 'Import invitation', body: 'Upload an existing image or PDF after the event is created.' },
+              { value: 'designed', title: 'Design invitation', body: 'Use a simple template and live preview in Owambe.' },
+              { value: 'ai_generated', title: 'Generate copy', body: 'Start with deterministic Owambe-style invitation copy.' },
+            ].map(option => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setInvitationIntent(option.value as InvitationIntent)}
+                className={`rounded-2xl border p-4 text-left transition-colors ${invitationIntent === option.value ? 'border-pulse/50 bg-pulse/10' : 'border-white/10 bg-[#040404] hover:border-white/20'}`}
+              >
+                <p className="text-sm font-semibold text-foreground">{option.title}</p>
+                <p className="mt-2 text-sm leading-6 text-foreground/60">{option.body}</p>
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => setStep(4)}
+              className="flex-1 rounded-lg border border-white/10 py-3 text-sm hover:border-white/20 transition-colors"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={() => setStep(6)}
+              className="flex-1 rounded-lg bg-pulse py-3 text-sm font-semibold text-void transition-colors"
+            >
+              Continue to review
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 6 && (
         <form onSubmit={handleSubmit} className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-6">
           <div>
-            <p className="text-sm uppercase tracking-[0.2em] text-foreground/50">Step 5 of 5</p>
+            <p className="text-sm uppercase tracking-[0.2em] text-foreground/50">Step 6 of 6</p>
             <h1 className="mt-2 text-3xl font-bold">Review & create</h1>
             <p className="mt-2 text-sm text-foreground/70">
               Confirm the occasion, theme, and event details before you create the workspace.
@@ -430,6 +492,10 @@ export default function NewEventPage() {
               <p className="mt-2 text-sm text-foreground/60">Suggested vendors: {theme.suggestedVendorCategories.join(', ')}</p>
               <p className="mt-2 text-sm text-foreground/60">Budget categories: {theme.suggestedBudgetCategories.join(', ')}</p>
             </div>
+            <div>
+              <p className="text-sm uppercase text-foreground/50">Invitation</p>
+              <p className="mt-2 text-sm text-foreground/60">{invitationIntent === 'skip' ? 'Skip for now' : invitationIntent.replace(/_/g, ' ')}</p>
+            </div>
           </div>
 
           {error && <p className="text-sm text-red-400">{error}</p>}
@@ -437,7 +503,7 @@ export default function NewEventPage() {
           <div className="flex flex-col gap-3 sm:flex-row">
             <button
               type="button"
-              onClick={() => setStep(4)}
+              onClick={() => setStep(5)}
               className="flex-1 rounded-lg border border-white/10 py-3 text-sm hover:border-white/20 transition-colors"
             >
               Back

@@ -6,7 +6,19 @@ import type { OccasionType } from '@/lib/occasion/occasion-types'
 import { formatCurrency } from '@/lib/utils'
 import { PledgeForm } from '@/components/public/pledge-form'
 import { MemoryWallForm } from '@/components/public/memory-wall-form'
+import { InvitationPreview } from '@/components/invitations/invitation-preview'
+import { generateInvitationCopy, buildWhatsappShareUrl } from '@/lib/invitations/generator'
+import { buildAnnouncementWhatsappUrl } from '@/lib/announcements/templates'
+import { GalleryPublic, type GalleryMediaRecord, type GallerySectionRecord } from '@/components/gallery/gallery-public'
+import { GalleryUploadForm } from '@/components/gallery/gallery-upload-form'
 import type { Event } from '@/types'
+
+type PublicContribution = {
+  id: string
+  display_name: string
+  amount: number
+  message?: string | null
+}
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params
@@ -46,6 +58,10 @@ export default async function GuestPage({ params }: { params: Promise<{ slug: st
     { data: contributions },
     { data: memoryPosts },
     { data: updates },
+    { data: activeInvitation },
+    { data: publicAnnouncements },
+    { data: gallerySections },
+    { data: galleryMedia },
   ] = await Promise.all([
     supabase
       .from('sponsorship_categories')
@@ -68,9 +84,54 @@ export default async function GuestPage({ params }: { params: Promise<{ slug: st
       .eq('is_public', true)
       .order('created_at', { ascending: false })
       .limit(4),
+    supabase
+      .from('event_invitations')
+      .select('*')
+      .eq('occasion_id', ev.id)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .maybeSingle(),
+    supabase
+      .from('event_announcements')
+      .select('*')
+      .eq('occasion_id', ev.id)
+      .eq('visibility', 'public')
+      .eq('share_to_public_page', true)
+      .lte('publish_at', new Date().toISOString())
+      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+      .order('pinned', { ascending: false })
+      .order('publish_at', { ascending: false })
+      .limit(6),
+    supabase
+      .from('event_gallery_sections')
+      .select('*')
+      .eq('occasion_id', ev.id)
+      .eq('is_active', true)
+      .eq('visibility', 'public')
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true }),
+    supabase
+      .from('event_gallery_media')
+      .select('*')
+      .eq('occasion_id', ev.id)
+      .eq('visibility', 'public')
+      .eq('moderation_status', 'approved')
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: false }),
   ])
   const publicUrl = `${process.env.NEXT_PUBLIC_SITE_URL || ''}/e/${slug}`
-  const whatsappHref = `https://wa.me/?text=${encodeURIComponent(`Join us for ${ev.title}: ${publicUrl || `/e/${slug}`}`)}`
+  const shareTarget = publicUrl || `/e/${slug}`
+  const invitationCopy = generateInvitationCopy({
+    occasionType,
+    eventName: activeInvitation?.title ?? ev.title,
+    dateTime: ev.event_date,
+    location: activeInvitation?.venue_address ?? ev.location,
+    hostNames: activeInvitation?.host_names,
+    rsvpLink: shareTarget,
+    contributionLink: `${shareTarget}#pledge`,
+    templateId: activeInvitation?.template_id,
+  }).whatsappCopy
+  const whatsappHref = buildWhatsappShareUrl(invitationCopy)
 
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-10 px-4 py-12">
@@ -94,6 +155,34 @@ export default async function GuestPage({ params }: { params: Promise<{ slug: st
         </div>
       </div>
 
+      {activeInvitation && (
+        <section className="grid gap-6 lg:grid-cols-[0.85fr_1fr] lg:items-start">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground/50">Invitation</p>
+            <h2 className="mt-2 font-display text-2xl font-semibold">{activeInvitation.title}</h2>
+            {activeInvitation.body && <p className="mt-2 text-sm leading-6 text-foreground/60">{activeInvitation.body}</p>}
+            <a href={whatsappHref} target="_blank" rel="noreferrer" className="mt-4 inline-flex rounded-lg border border-sage/30 bg-sage/5 px-4 py-2 text-sm font-semibold text-sage hover:bg-sage/10">
+              Share invitation
+            </a>
+          </div>
+          <InvitationPreview
+            title={activeInvitation.title}
+            subtitle={activeInvitation.subtitle}
+            body={activeInvitation.body}
+            hostNames={activeInvitation.host_names}
+            dateTime={ev.event_date ? new Date(ev.event_date).toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' }) : null}
+            venueName={activeInvitation.venue_name}
+            venueAddress={activeInvitation.venue_address}
+            dressCode={activeInvitation.dress_code}
+            rsvpNote={activeInvitation.rsvp_note}
+            supportNote={activeInvitation.support_note}
+            templateId={activeInvitation.template_id}
+            fileUrl={activeInvitation.file_url}
+            previewUrl={activeInvitation.preview_url}
+          />
+        </section>
+      )}
+
       <section className="rounded-2xl border border-white/10 bg-white/5 p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -105,6 +194,29 @@ export default async function GuestPage({ params }: { params: Promise<{ slug: st
           </p>
         </div>
       </section>
+
+      {!!publicAnnouncements?.length && (
+        <section className="rounded-xl border border-white/5 p-4">
+          <h2 className="font-display text-2xl font-semibold">Public announcements</h2>
+          <div className="mt-4 grid gap-3">
+            {publicAnnouncements.map(item => (
+              <article key={item.id} className={`rounded-lg border p-3 ${item.priority === 'urgent' ? 'border-red-400/30 bg-red-500/10' : item.pinned ? 'border-pulse/30 bg-pulse/10' : 'border-white/5'}`}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-medium">{item.title}</p>
+                  {item.pinned && <span className="rounded-full bg-pulse/15 px-2 py-0.5 text-[11px] text-pulse">pinned</span>}
+                  {item.priority === 'urgent' && <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] text-red-200">urgent</span>}
+                </div>
+                <p className="mt-1 text-sm leading-6 text-foreground/60">{item.body}</p>
+                {item.share_to_whatsapp_ready && (
+                  <a href={buildAnnouncementWhatsappUrl({ eventName: ev.title, title: item.title, body: item.body, link: shareTarget })} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg border border-sage/20 px-3 py-1.5 text-xs text-sage hover:bg-sage/10">
+                    Share update
+                  </a>
+                )}
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
       {!!updates?.length && (
         <section className="rounded-xl border border-white/5 p-4">
@@ -119,6 +231,31 @@ export default async function GuestPage({ params }: { params: Promise<{ slug: st
           </div>
         </section>
       )}
+
+      <GalleryPublic
+        eventName={ev.title}
+        eventUrl={shareTarget}
+        occasionType={occasionType}
+        sections={(gallerySections ?? []) as GallerySectionRecord[]}
+        media={(galleryMedia ?? []) as GalleryMediaRecord[]}
+      />
+
+      <section className="grid gap-6 lg:grid-cols-[0.75fr_1fr]">
+        <div>
+          <h2 className="font-display text-2xl font-semibold">{respectful ? 'Share a memory or tribute' : 'Upload your memories'}</h2>
+          <p className="mt-1 text-sm text-foreground/60">
+            {respectful
+              ? 'Guest media is reviewed before it appears publicly.'
+              : 'Add photos or short videos from the celebration. Guest uploads are reviewed before appearing publicly.'}
+          </p>
+        </div>
+        <GalleryUploadForm
+          eventId={ev.id}
+          sections={(gallerySections ?? []) as GallerySectionRecord[]}
+          guestMode
+          respectful={respectful}
+        />
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_0.8fr]">
         <section className="flex flex-col gap-4">
@@ -164,7 +301,7 @@ export default async function GuestPage({ params }: { params: Promise<{ slug: st
             <div className="rounded-xl border border-white/5 p-4">
               <h3 className="font-display text-lg font-semibold">Recent support</h3>
               <div className="mt-3 grid gap-3">
-                {contributions.map(contribution => (
+                {(contributions as PublicContribution[]).map(contribution => (
                   <div key={contribution.id} className="border-b border-white/5 pb-3 last:border-0 last:pb-0">
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-sm font-medium">{contribution.display_name}</p>
